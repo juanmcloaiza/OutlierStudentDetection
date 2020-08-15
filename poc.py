@@ -1,5 +1,6 @@
 import PyQt5.QtWidgets as qtw
 from PyQt5 import QtCore
+from PyQt5.QtGui import QValidator, QColor
 from PyQt5.QtCore import Qt, pyqtSlot, pyqtSignal
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
@@ -54,6 +55,7 @@ class PlotData(FrozenClass):
         self.Xerr = dict()
         self.Z = dict()
         self.Zerr = dict()
+        self.OL = dict()
         return
 
 
@@ -146,8 +148,8 @@ class MyGraphView(qtw.QWidget):
         dy = 0.4
         y0 = 1-s-dy
         x0 = 0.15
-        xlabel = "$XLABEL$"
-        ylabel = "$YLABEL$"
+        xlabel = "$AGE$"
+        ylabel = "$GPA$"
         self.ax =  self.canvas.figure.add_axes([x0,y0,dx,dy])
         self.zoom_ax = self.canvas.figure.add_axes([1-s-dx,y0,dx,dy])
 
@@ -247,22 +249,25 @@ class MyGraphView(qtw.QWidget):
                 raise NotImplementedError
         return
 
-    def assign_colors(self, key1, key2):
+    def assign_colors(self, key1, key2, isol):
         key1 = np.asarray(key1)
         key2 = np.asarray(key2)
+        isol = np.asarray(isol)
         discriminator = 10*key1 + key2
-        colarr = np.zeros_like(discriminator)
-        colors = ['k', 'C1', 'C2', 'C3']
+        colarr = [None]*len(discriminator)
+        colors = ['C0', 'C1', 'C2', 'C4', 'C3']
         for i in range(len(discriminator)):
             d = discriminator[i]
             if d == 0:
-                colarr[i] = 0
+                colarr[i] = colors[0]
             if d == 1:
-                colarr[i] = 1
+                colarr[i] = colors[1]
             if d == 10:
-                colarr[i] = 2
+                colarr[i] = colors[2]
             if d == 11:
-                colarr[i] = 3
+                colarr[i] = colors[3]
+            if isol[i]:
+                colarr[i] = colors[4]
         return colarr
 
 
@@ -275,14 +280,22 @@ class MyGraphView(qtw.QWidget):
             Z = self.data.Z[label]
             Xerr = self.data.Xerr[label]
             Zerr = self.data.Zerr[label]
-            colarr = self.assign_colors(Xerr, Zerr)
+            OL = self.data.OL[label]
+            olidxs = np.where(OL)
+            colarr = self.assign_colors(Xerr, Zerr, OL)
             lbl = label.split('/')[-1]
+            Xol = X[olidxs]
+            Zol = Z[olidxs]
             if label == self.params.selected_label:
-                line = self.ax.scatter(X, Z, c=colarr, alpha = 1, label = lbl, zorder=np.inf)
+                line = self.ax.scatter(X, Z, c=colarr, alpha = 1, label = lbl)
                 self.zoom_ax.scatter(X, Z, c=colarr, alpha = 1, label = lbl)
+                self.zoom_ax.scatter(Xol, Zol, c='k', alpha = 1, label = lbl)
+                self.ax.scatter(Xol, Zol, c='k', alpha = 1, label = lbl)
+
                 self.zoom_ax.set_title(label, fontsize=5)
             else:
                 self.ax.scatter(X, Z, c=colarr, alpha = 0.1, label = lbl)
+                self.ax.scatter(Xol, Zol, c='k', alpha = 0.5, label = lbl, zorder = np.inf)
         #self.ax.set_xlim(xmin, xmax)
         #self.ax.set_ylim(ymin, ymax)
         self.ax.legend(loc='upper left', bbox_to_anchor= (-0.3, -0.3), ncol=3,
@@ -322,8 +335,9 @@ class MyGraphView(qtw.QWidget):
         Z = np.random.normal(0,1,1024)
         Zerr = 0 * Z
         Xerr = 0 * X
+        OL = 0 * X + 1
         label = "test"
-        self.update_graph(X={label:X}, Z={label:Z}, Zerr={label:Zerr}, Xerr={label:Xerr})
+        self.update_graph(X={label:X}, Z={label:Z}, Zerr={label:Zerr}, Xerr={label:Xerr}, OL={label:OL})
         #np.save("./myNumpyArray.npy", 3 + 10*np.sin(np.sqrt(X**2 + Y**2)))
         #np.savetxt("./myNumpyArray.txt", 3 + 10*np.sin(np.sqrt(X**2 + Y**2)))
         return
@@ -351,6 +365,7 @@ class Experiment(FrozenClass):
         #Dicts of (str, numpy array) representing
         # (Filename, numpy array) pairs
         self.ID = dict()
+        self.OL = dict()
         self.Q = dict()
         self.R = dict()
         self.dR = dict()
@@ -365,7 +380,7 @@ class MyInfoTable(qtw.QTableWidget, FrozenClass):
         super().__init__()
         self.col = dict()
         self.setColumnCount(4)
-        labels = ("ID", "Q", "R", "dR", "dQ")
+        labels = ("ID", "OL", "Q", "R", "dR", "dQ")
         for i, l in enumerate(labels):
             self.col[l] = i
         self.setHorizontalHeaderLabels(labels)
@@ -471,9 +486,6 @@ class MyFrame(qtw.QFrame,FrozenClass):
         return
 
 
-
-
-
     def addPanels(self):
         self.layout.addLayout(self.leftpanel)
         self.layout.addLayout(self.centralpanel)
@@ -494,6 +506,8 @@ class MyFrame(qtw.QFrame,FrozenClass):
         #self.graphView.test()
         #return
         if not self.read_data_files():
+            return
+        if not self.catch_outlayers():
             return
         if not self.update_gui():
             return
@@ -549,6 +563,7 @@ class MyFrame(qtw.QFrame,FrozenClass):
         dr = y_err
 
         self.experiment.ID[fp.name]  = np.asarray(sid)
+        self.experiment.OL[fp.name]  = 0*np.asarray(sid).astype(int)
         self.experiment.Q[fp.name]  = np.asarray(q)
         self.experiment.R[fp.name]  = np.asarray(r)
         self.experiment.dR[fp.name] = np.asarray(dr)
@@ -589,6 +604,29 @@ class MyFrame(qtw.QFrame,FrozenClass):
         return None
 
 
+    def is_outlayer(self, X, Z, Xerr, Zerr):
+        y = np.random.uniform(0,1,X.shape)
+        isol = np.zeros_like(y)
+        isol[np.where(y > 0.9)] += 1
+        return isol
+
+
+    def catch_outlayers(self):
+        try:
+
+            for label in self.settings.dataFileNames:
+                X = self.experiment.Q[label]
+                Z = self.experiment.R[label]
+                Xerr = self.experiment.dQ[label]
+                Zerr = self.experiment.dR[label]
+                self.experiment.OL[label] = self.is_outlayer(X,Z,Xerr,Zerr)
+        except Exception as e:
+            App.handle_exception(e)
+            return False
+
+        return True
+
+
     def update_gui(self):
         try:
             self.graphView.update_graph(
@@ -596,6 +634,7 @@ class MyFrame(qtw.QFrame,FrozenClass):
                             Z = self.experiment.R,
                             Xerr = self.experiment.dQ,
                             Zerr = self.experiment.dR,
+                            OL = self.experiment.OL,
                             selected_label=self.settings.selected_file
                             )
             self.update_widgets()
@@ -622,12 +661,14 @@ class MyFrame(qtw.QFrame,FrozenClass):
 
 
         sid = self.experiment.ID[fname]
+        isol = self.experiment.OL[fname]
         q = self.experiment.Q[fname]
         r = self.experiment.R[fname]
         dr = self.experiment.dR[fname]
         dq = self.experiment.dQ[fname]
 
         icol = self.infoTable.col["ID"]
+        olcol = self.infoTable.col["OL"]
         qcol = self.infoTable.col["Q"]
         rcol = self.infoTable.col["R"]
         dqcol = self.infoTable.col["dQ"]
@@ -636,21 +677,28 @@ class MyFrame(qtw.QFrame,FrozenClass):
 
         for i in range(len(q)):
             sidi = qtw.QTableWidgetItem(str(sid[i]))
+            isoli = qtw.QTableWidgetItem(str(isol[i]))
             qi = qtw.QTableWidgetItem(str(q[i]))
             ri = qtw.QTableWidgetItem(str(r[i]))
             dri = qtw.QTableWidgetItem(str(dr[i]))
             dqi = qtw.QTableWidgetItem(str(dq[i]))
             self.infoTable.insertRow(i)
             IDc = self.infoTable.horizontalHeader().logicalIndex(icol)
+            OLc = self.infoTable.horizontalHeader().logicalIndex(olcol)
             Qc = self.infoTable.horizontalHeader().logicalIndex(qcol)
             Rc = self.infoTable.horizontalHeader().logicalIndex(rcol)
             dRc = self.infoTable.horizontalHeader().logicalIndex(drcol)
             dQc = self.infoTable.horizontalHeader().logicalIndex(dqcol)
             self.infoTable.setItem(i,IDc,sidi)
+            self.infoTable.setItem(i,OLc,isoli)
             self.infoTable.setItem(i,Qc,qi)
             self.infoTable.setItem(i,Rc,ri)
             self.infoTable.setItem(i,dRc,dri)
             self.infoTable.setItem(i,dQc,dqi)
+            if isol[i] > 0:
+                current_item = self.infoTable.item(i,IDc)
+                red = QColor(255, 000, 0, 127)
+                current_item.setBackground(red)
 
         self.minSpinBox.setValue(self.graphView.params.zmin)
         self.maxSpinBox.setValue(self.graphView.params.zmax)
@@ -661,6 +709,7 @@ class MyFrame(qtw.QFrame,FrozenClass):
     @pyqtSlot()
     def on_section_moved(self):
         q_r_dr_dq_dict = {self.infoTable.col["ID"]: self.experiment.ID,
+                          self.infoTable.col["OL"]: self.experiment.OL,
                           self.infoTable.col["Q"]: self.experiment.Q,
                           self.infoTable.col["R"]: self.experiment.R,
                           self.infoTable.col["dR"]: self.experiment.dR,
@@ -678,12 +727,14 @@ class MyFrame(qtw.QFrame,FrozenClass):
             new_col[new_labels[i]] = i
 
         sid = q_r_dr_dq_dict[new_col["ID"]]
+        isol = q_r_dr_dq_dict[new_col["OL"]]
         q = q_r_dr_dq_dict[new_col["Q"]]
         r = q_r_dr_dq_dict[new_col["R"]]
         dr = q_r_dr_dq_dict[new_col["dR"]]
         dq = q_r_dr_dq_dict[new_col["dQ"]]
 
         self.experiment.ID = ID
+        self.experiment.OL = OL
         self.experiment.Q = q
         self.experiment.R = r
         self.experiment.dR = dr
