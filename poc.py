@@ -450,9 +450,9 @@ class MyFrame(qtw.QFrame,FrozenClass):
         buttonOpenDialog.clicked.connect(self.on_click_open_file)
         self.leftpanel.addWidget(buttonOpenDialog)
 
-        buttonLogLinear = qtw.QPushButton("Log / Linear")
-        buttonLogLinear .clicked.connect(self.on_click_loglinear)
-        self.rightpanel.addWidget(buttonLogLinear)
+        buttonExportOutliers = qtw.QPushButton("Export outliers")
+        buttonExportOutliers.clicked.connect(self.on_click_export_outliers)
+        self.rightpanel.addWidget(buttonExportOutliers)
 
         buttonSavePng = qtw.QPushButton("Save png or pdf")
         buttonSavePng.clicked.connect(self.on_click_save_png)
@@ -787,11 +787,64 @@ class MyFrame(qtw.QFrame,FrozenClass):
             App.handle_exception(e)
 
 
+    def save_ascii_table(self, array):
+        try:
+            fmt_choices = {"All Files(*)":".csv", #default
+                            "png (*.png)":".png",
+                            "pdf (*.pdf)": ".pdf",
+                            "csv (*.csv)": ".csv",
+                            "ascii (*.txt)": ".txt"}
+            choices_str = ";;".join([]+[k for k in fmt_choices.keys()])
+            options = qtw.QFileDialog.Options()
+            options |= qtw.QFileDialog.DontUseNativeDialog
+            filePath, fmtChoice = qtw.QFileDialog.getSaveFileName(self,"Save File", "",
+                                                          choices_str, options=options)
+            if not filePath:
+                return None
+
+            extension = os.path.splitext(filePath)[-1]
+            if extension not in fmt_choices.values():
+                extension = fmt_choices[fmtChoice]
+                filePath+=extension
+
+            np.savetxt(filePath, array, delimiter=" ", fmt="%s")
+            print(f"Ascii saved: {filePath}")
+        except Exception as e:
+            App.handle_exception(e)
+        return #save_ascii_table
+
+
 
     @pyqtSlot()
-    def on_click_loglinear(self):
-        self.graphView.update_graph(log_scale = not self.graphView.params.log_scale, reset_limits_required=True)
-        return
+    def on_click_export_outliers(self):
+        try:
+            #Dicts of (str, numpy array) representing
+            # (Filename, numpy array) pairs
+            cols = []
+            for fname in self.experiment.Q.keys():
+                ID = self.experiment.ID[fname]
+                X = self.experiment.Q[fname]
+                Z = self.experiment.R[fname]
+                Xerr = self.experiment.dQ[fname]
+                Zerr = self.experiment.dR[fname]
+                OL = self.experiment.OL[fname]
+                olidxs = np.where(OL)
+
+                IDol = ID[olidxs]
+                Xol = X[olidxs]
+                Zol = Z[olidxs]
+                Xerrol = Xerr[olidxs]
+                Zerrol = Zerr[olidxs]
+                fnameol = [fname] * len(IDol)
+
+                columns = np.column_stack((fnameol, IDol, Xol, Zol, Xerrol, Zerrol))
+                cols.append(columns)
+
+            totcols = np.vstack(cols)
+            self.save_ascii_table(totcols)
+        except Exception as e:
+            App.handle_exception(e)
+        return #on_click_export_outlier
 
 
     @pyqtSlot()
