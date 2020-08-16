@@ -351,8 +351,6 @@ class Settings(FrozenClass):
         self.dataDirPath = None
         self.dataFileNames = []
         self.selected_file = None
-        self.model_filename = 'trainedEllipticEnvelope.joblib'
-        self.model = jl.load(self.model_filename)
         self._freeze()
         return
 
