@@ -8,6 +8,11 @@ import matplotlib as mpl
 from matplotlib.widgets import RectangleSelector
 from mpl_toolkits.axes_grid.inset_locator import inset_axes
 import numpy as np
+
+#https://scikit-learn.org/stable/auto_examples/miscellaneous/plot_anomaly_comparison.html
+#https://scikit-learn.org/stable/modules/generated/sklearn.covariance.EllipticEnvelope.html
+from sklearn.neighbors import LocalOutlierFactor
+import joblib as jl
 import sys
 import os
 import re
@@ -255,7 +260,7 @@ class MyGraphView(qtw.QWidget):
         isol = np.asarray(isol)
         discriminator = 10*key1 + key2
         colarr = [None]*len(discriminator)
-        colors = ['C0', 'C1', 'C2', 'C4', 'C3']
+        colors = ['C0', 'C1', 'C2', 'C4']
         for i in range(len(discriminator)):
             d = discriminator[i]
             if d == 0:
@@ -266,8 +271,6 @@ class MyGraphView(qtw.QWidget):
                 colarr[i] = colors[2]
             if d == 11:
                 colarr[i] = colors[3]
-            if isol[i]:
-                colarr[i] = colors[4]
         return colarr
 
 
@@ -289,13 +292,13 @@ class MyGraphView(qtw.QWidget):
             if label == self.params.selected_label:
                 line = self.ax.scatter(X, Z, c=colarr, alpha = 1, label = lbl)
                 self.zoom_ax.scatter(X, Z, c=colarr, alpha = 1, label = lbl)
-                self.zoom_ax.scatter(Xol, Zol, c='k', alpha = 1, label = lbl)
-                self.ax.scatter(Xol, Zol, c='k', alpha = 1, label = lbl)
+                self.zoom_ax.scatter(Xol, Zol, c='k', alpha = 1, label = lbl, marker='.', zorder = np.inf)
+                self.ax.scatter(     Xol, Zol, c='k', alpha = 1, label = lbl, marker='.', zorder = np.inf)
 
                 self.zoom_ax.set_title(label, fontsize=5)
             else:
                 self.ax.scatter(X, Z, c=colarr, alpha = 0.1, label = lbl)
-                self.ax.scatter(Xol, Zol, c='k', alpha = 0.5, label = lbl, zorder = np.inf)
+                self.ax.scatter(Xol, Zol, c='k',alpha = 0.1, label = lbl, marker='.')
         #self.ax.set_xlim(xmin, xmax)
         #self.ax.set_ylim(ymin, ymax)
         self.ax.legend(loc='upper left', bbox_to_anchor= (-0.3, -0.3), ncol=3,
@@ -335,7 +338,7 @@ class MyGraphView(qtw.QWidget):
         Z = np.random.normal(0,1,1024)
         Zerr = 0 * Z
         Xerr = 0 * X
-        OL = 0 * X + 1
+        OL = MyFrame.is_outlayer(X,Z,Xerr,Zerr)
         label = "test"
         self.update_graph(X={label:X}, Z={label:Z}, Zerr={label:Zerr}, Xerr={label:Xerr}, OL={label:OL})
         #np.save("./myNumpyArray.npy", 3 + 10*np.sin(np.sqrt(X**2 + Y**2)))
@@ -348,6 +351,8 @@ class Settings(FrozenClass):
         self.dataDirPath = None
         self.dataFileNames = []
         self.selected_file = None
+        self.model_filename = 'trainedEllipticEnvelope.joblib'
+        self.model = jl.load(self.model_filename)
         self._freeze()
         return
 
@@ -379,8 +384,8 @@ class MyInfoTable(qtw.QTableWidget, FrozenClass):
     def __init__(self):
         super().__init__()
         self.col = dict()
-        self.setColumnCount(4)
         labels = ("ID", "OL", "Q", "R", "dR", "dQ")
+        self.setColumnCount(len(labels))
         for i, l in enumerate(labels):
             self.col[l] = i
         self.setHorizontalHeaderLabels(labels)
@@ -507,7 +512,7 @@ class MyFrame(qtw.QFrame,FrozenClass):
         #return
         if not self.read_data_files():
             return
-        if not self.catch_outlayers():
+        if not self.catch_outliers():
             return
         if not self.update_gui():
             return
@@ -541,7 +546,7 @@ class MyFrame(qtw.QFrame,FrozenClass):
                 elif len(nums) != numcols:
                     # if the number of columns changes there's an issue
                     break
-                
+
                 sid.append(nums[0])
                 x.append(nums[1])
                 y.append(nums[2])
@@ -604,14 +609,19 @@ class MyFrame(qtw.QFrame,FrozenClass):
         return None
 
 
-    def is_outlayer(self, X, Z, Xerr, Zerr):
-        y = np.random.uniform(0,1,X.shape)
-        isol = np.zeros_like(y)
-        isol[np.where(y > 0.9)] += 1
+    @staticmethod
+    def is_outlier(X, Z, Xerr, Zerr):
+        print(f"Detecting outliers for {len(X)} samples...")
+        #model = self.settings.model
+        model = LocalOutlierFactor()
+        stacked = np.vstack([X, Z, Xerr, Zerr]).T
+        #the model predicts 1 for inliers and -1 for outliers
+        #isol = np.ceil(- 0.5 * model.predict(stacked)).astype(bool)
+        isol = np.ceil(- 0.5 * model.fit_predict(stacked)).astype(bool)
         return isol
 
 
-    def catch_outlayers(self):
+    def catch_outliers(self):
         try:
 
             for label in self.settings.dataFileNames:
