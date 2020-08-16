@@ -402,6 +402,7 @@ class MyFrame(qtw.QFrame,FrozenClass):
         self.settings = Settings()
         self.experiment = Experiment()
         self.layout = qtw.QHBoxLayout()
+        self.splitter = qtw.QSplitter()
         self.centralpanel = qtw.QVBoxLayout()
         self.leftpanel = qtw.QVBoxLayout()
         self.rightpanel = qtw.QVBoxLayout()
@@ -426,8 +427,8 @@ class MyFrame(qtw.QFrame,FrozenClass):
         self.setLayout(self.layout)
 
     def addCanvas(self):
-        self.graphView.setMinimumSize(640,480)
-        self.graphView.setMaximumSize(640,480)
+        #self.graphView.setMinimumSize(640,480)
+        #self.graphView.setMaximumSize(640,480)
         self.centralpanel.addWidget(self.graphView)
         #self.graphView.finishedUpdating.connect(self.on_graph_updated)
         self.graphView.update_graph()
@@ -437,7 +438,7 @@ class MyFrame(qtw.QFrame,FrozenClass):
 
 
     def addFileList(self):
-        self.fileList.setMinimumWidth(640./3.)
+        #self.fileList.setMinimumWidth(640./3.)
         self.leftpanel.addWidget(qtw.QLabel("Loaded Files:"))
         self.leftpanel.addWidget(self.fileList)
         self.fileList.itemSelectionChanged.connect(self.on_list_selection_changed)
@@ -490,16 +491,22 @@ class MyFrame(qtw.QFrame,FrozenClass):
             App.handle_exception(e)
         return
 
+    @staticmethod
+    def widgetizeLayout(layoutpanel):
+        layoutWidget = qtw.QWidget()
+        layoutWidget.setLayout(layoutpanel)
+        return layoutWidget
 
     def addPanels(self):
-        self.layout.addLayout(self.leftpanel)
-        self.layout.addLayout(self.centralpanel)
-        self.layout.addLayout(self.rightpanel)
+        self.splitter.addWidget(self.widgetizeLayout(self.leftpanel))
+        self.splitter.addWidget(self.widgetizeLayout(self.centralpanel))
+        self.splitter.addWidget(self.widgetizeLayout(self.rightpanel))
+        self.layout.addWidget(self.splitter)
         return
 
 
     def addExperimentInfo(self):
-        self.infoTable.setMinimumWidth(640./3.)
+        #self.infoTable.setMinimumWidth(640./3.)
         self.infoTable.horizontalHeader().sectionMoved.connect(self.on_section_moved)
         self.infoTableLabel = qtw.QLabel("Loaded data:")
         self.rightpanel.addWidget(self.infoTableLabel)
@@ -879,8 +886,8 @@ class App(qtw.QMainWindow, FrozenClass):
         dx = dw.width()
         dy = dw.height()
 
-        self.setMinimumSize(1200, 480)
-        self.setMaximumSize(0.7*dx, 0.7*dy)
+        #self.setMinimumSize(1200, 480)
+        #self.setMaximumSize(0.7*dx, 0.7*dy)
         self.title = 'Reflectometry Data Viewer'
         self.my_tabs = MyTabs()
         self.setCentralWidget(self.my_tabs)
