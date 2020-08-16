@@ -338,7 +338,7 @@ class MyGraphView(qtw.QWidget):
         Z = np.random.normal(0,1,1024)
         Zerr = 0 * Z
         Xerr = 0 * X
-        OL = MyFrame.is_outlayer(X,Z,Xerr,Zerr)
+        OL = MyFrame.is_outlier(X,Z,Xerr,Zerr)
         label = "test"
         self.update_graph(X={label:X}, Z={label:Z}, Zerr={label:Zerr}, Xerr={label:Xerr}, OL={label:OL})
         #np.save("./myNumpyArray.npy", 3 + 10*np.sin(np.sqrt(X**2 + Y**2)))
@@ -629,7 +629,7 @@ class MyFrame(qtw.QFrame,FrozenClass):
                 Z = self.experiment.R[label]
                 Xerr = self.experiment.dQ[label]
                 Zerr = self.experiment.dR[label]
-                self.experiment.OL[label] = self.is_outlayer(X,Z,Xerr,Zerr)
+                self.experiment.OL[label] = self.is_outlier(X,Z,Xerr,Zerr)
         except Exception as e:
             App.handle_exception(e)
             return False
