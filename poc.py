@@ -369,10 +369,10 @@ class Experiment(FrozenClass):
         # (Filename, numpy array) pairs
         self.ID = dict()
         self.OL = dict()
-        self.Q = dict()
-        self.R = dict()
-        self.dR = dict()
-        self.dQ = dict()
+        self.Age = dict()
+        self.GPA = dict()
+        self.SportPrices = dict()
+        self.ExtraAct = dict()
 
         self._freeze()
 
@@ -382,7 +382,7 @@ class MyInfoTable(qtw.QTableWidget, FrozenClass):
     def __init__(self):
         super().__init__()
         self.col = dict()
-        labels = ("ID", "OL", "Q", "R", "dR", "dQ")
+        labels = ("ID", "OL", "Age", "GPA", "SportPrices", "ExtraAct")
         self.setColumnCount(len(labels))
         for i, l in enumerate(labels):
             self.col[l] = i
@@ -418,7 +418,6 @@ class MyFrame(qtw.QFrame,FrozenClass):
         self.layout.setAlignment(Qt.AlignCenter)
         self.addExperimentInfo()
         self.addFileList()
-        #self.addMinMaxSpinBoxes()
         self.addFunctionalityButtons()
         self.addCanvas()
         self.addPanels()
@@ -460,19 +459,6 @@ class MyFrame(qtw.QFrame,FrozenClass):
         #buttonSaveAscii.clicked.connect(self.on_click_save_ascii)
         self.rightpanel.addWidget(buttonSaveAscii)
 
-        return
-
-
-
-
-    def addMinMaxSpinBoxes(self):
-        self.init_spinbox(self.minSpinBox, self.on_spinbox_edit)
-        self.init_spinbox(self.maxSpinBox, self.on_spinbox_edit)
-        formLayout = qtw.QFormLayout()
-        formLayout.addRow(self.tr("&Min Intensity"), self.minSpinBox)
-        formLayout.addRow(self.tr("&Max Intensity"), self.maxSpinBox)
-        formLayout.setFormAlignment(Qt.AlignBottom)
-        self.rightpanel.addLayout(formLayout)
         return
 
 
@@ -524,7 +510,7 @@ class MyFrame(qtw.QFrame,FrozenClass):
         return
 
 
-    def parse_reflectometry_file(self, fp):
+    def parse_student_data_file(self, fp):
         lines = list(reversed(fp.readlines()))
         sid = list()
         x = list()
@@ -574,10 +560,10 @@ class MyFrame(qtw.QFrame,FrozenClass):
 
         self.experiment.ID[fp.name]  = np.asarray(sid)
         self.experiment.OL[fp.name]  = 0*np.asarray(sid).astype(int)
-        self.experiment.Q[fp.name]  = np.asarray(q)
-        self.experiment.R[fp.name]  = np.asarray(r)
-        self.experiment.dR[fp.name] = np.asarray(dr)
-        self.experiment.dQ[fp.name] = np.asarray(dq)
+        self.experiment.Age[fp.name]  = np.asarray(q)
+        self.experiment.GPA[fp.name]  = np.asarray(r)
+        self.experiment.SportPrices[fp.name] = np.asarray(dr)
+        self.experiment.ExtraAct[fp.name] = np.asarray(dq)
         return True
 
 
@@ -589,7 +575,7 @@ class MyFrame(qtw.QFrame,FrozenClass):
             return False
 
         for dataFile in dataFilePaths:
-            if not safe_parse(self.parse_reflectometry_file, dataFile):
+            if not safe_parse(self.parse_student_data_file, dataFile):
                 continue
             self.settings.dataFileNames.append(dataFile)
 
@@ -630,10 +616,10 @@ class MyFrame(qtw.QFrame,FrozenClass):
         try:
 
             for label in self.settings.dataFileNames:
-                X = self.experiment.Q[label]
-                Z = self.experiment.R[label]
-                Xerr = self.experiment.dQ[label]
-                Zerr = self.experiment.dR[label]
+                X = self.experiment.Age[label]
+                Z = self.experiment.GPA[label]
+                Xerr = self.experiment.ExtraAct[label]
+                Zerr = self.experiment.SportPrices[label]
                 self.experiment.OL[label] = self.is_outlier(X,Z,Xerr,Zerr)
         except Exception as e:
             App.handle_exception(e)
@@ -645,10 +631,10 @@ class MyFrame(qtw.QFrame,FrozenClass):
     def update_gui(self):
         try:
             self.graphView.update_graph(
-                            X = self.experiment.Q,
-                            Z = self.experiment.R,
-                            Xerr = self.experiment.dQ,
-                            Zerr = self.experiment.dR,
+                            X = self.experiment.Age,
+                            Z = self.experiment.GPA,
+                            Xerr = self.experiment.ExtraAct,
+                            Zerr = self.experiment.SportPrices,
                             OL = self.experiment.OL,
                             selected_label=self.settings.selected_file
                             )
@@ -677,17 +663,17 @@ class MyFrame(qtw.QFrame,FrozenClass):
 
         sid = self.experiment.ID[fname]
         isol = self.experiment.OL[fname]
-        q = self.experiment.Q[fname]
-        r = self.experiment.R[fname]
-        dr = self.experiment.dR[fname]
-        dq = self.experiment.dQ[fname]
+        q = self.experiment.Age[fname]
+        r = self.experiment.GPA[fname]
+        dr = self.experiment.SportPrices[fname]
+        dq = self.experiment.ExtraAct[fname]
 
         icol = self.infoTable.col["ID"]
         olcol = self.infoTable.col["OL"]
-        qcol = self.infoTable.col["Q"]
-        rcol = self.infoTable.col["R"]
-        dqcol = self.infoTable.col["dQ"]
-        drcol = self.infoTable.col["dR"]
+        qcol = self.infoTable.col["Age"]
+        rcol = self.infoTable.col["GPA"]
+        dqcol = self.infoTable.col["ExtraAct"]
+        drcol = self.infoTable.col["SportPrices"]
         self.infoTable.setRowCount(0)
 
         for i in range(len(q)):
@@ -702,14 +688,14 @@ class MyFrame(qtw.QFrame,FrozenClass):
             OLc = self.infoTable.horizontalHeader().logicalIndex(olcol)
             Qc = self.infoTable.horizontalHeader().logicalIndex(qcol)
             Rc = self.infoTable.horizontalHeader().logicalIndex(rcol)
-            dRc = self.infoTable.horizontalHeader().logicalIndex(drcol)
-            dQc = self.infoTable.horizontalHeader().logicalIndex(dqcol)
+            SportPricesc = self.infoTable.horizontalHeader().logicalIndex(drcol)
+            ExtraActc = self.infoTable.horizontalHeader().logicalIndex(dqcol)
             self.infoTable.setItem(i,IDc,sidi)
             self.infoTable.setItem(i,OLc,isoli)
             self.infoTable.setItem(i,Qc,qi)
             self.infoTable.setItem(i,Rc,ri)
-            self.infoTable.setItem(i,dRc,dri)
-            self.infoTable.setItem(i,dQc,dqi)
+            self.infoTable.setItem(i,SportPricesc,dri)
+            self.infoTable.setItem(i,ExtraActc,dqi)
             if isol[i] > 0:
                 current_item = self.infoTable.item(i,IDc)
                 red = QColor(255, 000, 0, 127)
@@ -725,10 +711,10 @@ class MyFrame(qtw.QFrame,FrozenClass):
     def on_section_moved(self):
         q_r_dr_dq_dict = {self.infoTable.col["ID"]: self.experiment.ID,
                           self.infoTable.col["OL"]: self.experiment.OL,
-                          self.infoTable.col["Q"]: self.experiment.Q,
-                          self.infoTable.col["R"]: self.experiment.R,
-                          self.infoTable.col["dR"]: self.experiment.dR,
-                          self.infoTable.col["dQ"]: self.experiment.dQ}
+                          self.infoTable.col["Age"]: self.experiment.Age,
+                          self.infoTable.col["GPA"]: self.experiment.GPA,
+                          self.infoTable.col["SportPrices"]: self.experiment.SportPrices,
+                          self.infoTable.col["ExtraAct"]: self.experiment.ExtraAct}
 
         new_labels = []
         t = self.infoTable
@@ -743,17 +729,17 @@ class MyFrame(qtw.QFrame,FrozenClass):
 
         sid = q_r_dr_dq_dict[new_col["ID"]]
         isol = q_r_dr_dq_dict[new_col["OL"]]
-        q = q_r_dr_dq_dict[new_col["Q"]]
-        r = q_r_dr_dq_dict[new_col["R"]]
-        dr = q_r_dr_dq_dict[new_col["dR"]]
-        dq = q_r_dr_dq_dict[new_col["dQ"]]
+        q = q_r_dr_dq_dict[new_col["Age"]]
+        r = q_r_dr_dq_dict[new_col["GPA"]]
+        dr = q_r_dr_dq_dict[new_col["SportPrices"]]
+        dq = q_r_dr_dq_dict[new_col["ExtraAct"]]
 
         self.experiment.ID = ID
         self.experiment.OL = OL
-        self.experiment.Q = q
-        self.experiment.R = r
-        self.experiment.dR = dr
-        self.experiment.dQ = dq
+        self.experiment.Age = q
+        self.experiment.GPA = r
+        self.experiment.SportPrices = dr
+        self.experiment.ExtraAct = dq
 
         for l in new_labels:
             self.infoTable.col[l] = new_col[l]
@@ -819,12 +805,12 @@ class MyFrame(qtw.QFrame,FrozenClass):
             #Dicts of (str, numpy array) representing
             # (Filename, numpy array) pairs
             cols = []
-            for fname in self.experiment.Q.keys():
+            for fname in self.experiment.Age.keys():
                 ID = self.experiment.ID[fname]
-                X = self.experiment.Q[fname]
-                Z = self.experiment.R[fname]
-                Xerr = self.experiment.dQ[fname]
-                Zerr = self.experiment.dR[fname]
+                X = self.experiment.Age[fname]
+                Z = self.experiment.GPA[fname]
+                Xerr = self.experiment.ExtraAct[fname]
+                Zerr = self.experiment.SportPrices[fname]
                 OL = self.experiment.OL[fname]
                 olidxs = np.where(OL)
 
@@ -939,7 +925,7 @@ class App(qtw.QMainWindow, FrozenClass):
 
         #self.setMinimumSize(1200, 480)
         #self.setMaximumSize(0.7*dx, 0.7*dy)
-        self.title = 'Reflectometry Data Viewer'
+        self.title = 'Outlier Detector'
         self.my_tabs = MyTabs()
         self.setCentralWidget(self.my_tabs)
 
