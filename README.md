@@ -1,6 +1,8 @@
 # OutlierStudentDetection
 
-Simple **GUI** that interactively demonstrates a Proof of Concept (PoC) Machine Learning **ETL pipeline** for **outlier detection**:
+Simple **GUI** that interactively demonstrates a Proof of Concept (PoC) Machine Learning **ETL pipeline** for **outlier detection**
+
+![Screenshot](./Screenshot.png)
 
  - **Extract:** *reads data* from a database (several csv files in this case).
  - **Transform:** *converts the extracted data* by using a simple Machine Learning **outlier detector model**; *combines the data* with an extra feature column linking each record to its original source (the original csv file).
